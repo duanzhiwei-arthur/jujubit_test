@@ -6,17 +6,41 @@ on:
     branches:
       - main
       - master
-concurrency:
-  group: android-real-device-smoke
-  cancel-in-progress: false
+
+# 联调阶段先去掉 concurrency，避免旧任务占住
+# concurrency:
+#   group: android-real-device-smoke
+#   cancel-in-progress: false
 
 jobs:
   smoke-test:
     runs-on: [self-hosted]
 
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    defaults:
+      run:
+        shell: bash
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Show runner environment
+        run: |
+          echo "whoami=$(whoami)"
+          echo "HOME=$HOME"
+          echo "GITHUB_WORKSPACE=${{ github.workspace }}"
+          pwd
+          ls -la
+          python3 --version || true
+          node --version || true
+          npm --version || true
+          which adb || true
+          adb version || true
+          which appium || true
+          appium -v || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -42,7 +66,7 @@ jobs:
 
       - name: Start Appium
         run: |
-          nohup appium -p 4723 --base-path / > appium.log 2>&1 &
+          nohup appium -p 4723 --base-path / > "${{ github.workspace }}/appium.log" 2>&1 &
           sleep 10
 
       - name: Verify Appium
@@ -51,16 +75,18 @@ jobs:
 
       - name: Prepare report dirs
         run: |
-          mkdir -p reports/allure-results
+          mkdir -p "${{ github.workspace }}/reports/allure-results"
+          mkdir -p "${{ github.workspace }}/screenshots"
+          ls -la "${{ github.workspace }}"
+          ls -la "${{ github.workspace }}/reports" || true
 
       - name: Run smoke tests
         id: run_tests
-        shell: bash
         run: |
           set +e
-          pytest tests -v -s --alluredir=reports/allure-results
+          pytest tests -v -s --alluredir="${{ github.workspace }}/reports/allure-results"
           EXIT_CODE=$?
-          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
           exit 0
 
       - name: Upload allure results
@@ -68,7 +94,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: allure-results
-          path: reports/allure-results
+          path: ${{ github.workspace }}/reports/allure-results
           if-no-files-found: ignore
 
       - name: Upload appium log
@@ -76,7 +102,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: appium-log
-          path: appium.log
+          path: ${{ github.workspace }}/appium.log
           if-no-files-found: ignore
 
       - name: Upload screenshots
@@ -84,12 +110,11 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: screenshots
-          path: screenshots
+          path: ${{ github.workspace }}/screenshots
           if-no-files-found: ignore
 
       - name: Notify Feishu
         if: always()
-        shell: bash
         run: |
           if [ "${{ steps.run_tests.outputs.exit_code }}" = "0" ]; then
             STATUS="成功"
@@ -100,13 +125,13 @@ jobs:
           ACTION_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
           curl -X POST "${{ secrets.FEISHU_WEBHOOK }}" \
-          -H "Content-Type: application/json" \
-          -d "{
-            \"msg_type\": \"text\",
-            \"content\": {
-              \"text\": \"【Android冒烟自动化】执行${STATUS}\n仓库：${{ github.repository }}\n分支：${{ github.ref_name }}\n执行人：${{ github.actor }}\n详情：${ACTION_URL}\"
-            }
-          }"
+            -H "Content-Type: application/json" \
+            -d "{
+              \"msg_type\": \"text\",
+              \"content\": {
+                \"text\": \"【Android冒烟自动化】执行${STATUS}\n仓库：${{ github.repository }}\n分支：${{ github.ref_name }}\n执行人：${{ github.actor }}\n详情：${ACTION_URL}\"
+              }
+            }"
 
       - name: Fail job if tests failed
         if: steps.run_tests.outputs.exit_code != '0'
