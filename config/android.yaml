@@ -1,0 +1,16 @@
+platformName: Android
+serverUrl: http://127.0.0.1:4723
+
+deviceName: R5CY23FBKFL
+automationName: UiAutomator2
+
+# 如果是安装包启动可以配 app
+# app: /path/to/app.apk
+
+# 如果是已安装应用启动
+appPackage: com.vast.jujubit
+appActivity: com.vast.jujubit.MainActivity
+
+# Flutter 场景可加
+noReset: true
+newCommandTimeout: 300

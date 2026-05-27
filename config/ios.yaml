@@ -1,0 +1,17 @@
+platformName: iOS
+serverUrl: http://127.0.0.1:4723
+
+deviceName: iPhone 14
+platformVersion: "17.0"
+udid: "你的真机UDID"
+automationName: XCUITest
+
+# 如果是已安装应用启动
+bundleId: com.example.app
+
+xcodeOrgId: "你的TeamID"
+xcodeSigningId: "iPhone Developer"
+updatedWDABundleId: "com.example.WebDriverAgentRunner"
+
+noReset: true
+newCommandTimeout: 300
