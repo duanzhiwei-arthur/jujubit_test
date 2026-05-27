@@ -1,4 +1,9 @@
-Appium-Python-Client
-pytest
+Appium-Python-Client==4.0.0
+pytest==8.2.2
 PyYAML
 selenium
+allure-pytest==2.13.5
+pytest-xdist
+requests
+pyyaml
+loguru
