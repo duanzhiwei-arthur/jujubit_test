@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   smoke-test:
-    runs-on: [self-hosted, android, real-device]
+    runs-on: [self-hosted]
 
     steps:
       - name: Checkout code
