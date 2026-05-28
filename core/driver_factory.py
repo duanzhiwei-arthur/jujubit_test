@@ -48,3 +48,5 @@ def get_driver(platform="android"):
     driver = webdriver.Remote(server_url, options=options)
     driver.implicitly_wait(10)
     return driver
+def create_driver(platform="android"):
+    return get_driver(platform)

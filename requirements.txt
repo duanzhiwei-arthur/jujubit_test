@@ -7,3 +7,5 @@ pytest-xdist
 requests
 pyyaml
 loguru
+pytest-json-report
+allure-pytest

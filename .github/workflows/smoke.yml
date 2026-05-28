@@ -7,11 +7,6 @@ on:
       - main
       - master
 
-# 联调阶段先去掉 concurrency，避免旧任务占住
-# concurrency:
-#   group: android-real-device-smoke
-#   cancel-in-progress: false
-
 jobs:
   smoke-test:
     runs-on: [self-hosted]
@@ -41,6 +36,8 @@ jobs:
           adb version || true
           which appium || true
           appium -v || true
+          which allure || true
+          allure --version || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -76,6 +73,7 @@ jobs:
       - name: Prepare report dirs
         run: |
           mkdir -p "${{ github.workspace }}/reports/allure-results"
+          mkdir -p "${{ github.workspace }}/reports/allure-report"
           mkdir -p "${{ github.workspace }}/screenshots"
           ls -la "${{ github.workspace }}"
           ls -la "${{ github.workspace }}/reports" || true
@@ -84,10 +82,44 @@ jobs:
         id: run_tests
         run: |
           set +e
-          pytest tests -v -s --alluredir="${{ github.workspace }}/reports/allure-results"
+          pytest tests -v -s \
+            --alluredir="${{ github.workspace }}/reports/allure-results" \
+            --json-report \
+            --json-report-file="${{ github.workspace }}/reports/report.json"
           EXIT_CODE=$?
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
           exit 0
+
+      - name: Build Feishu summary
+        if: always()
+        run: |
+          python scripts/build_feishu_summary.py
+
+      - name: Generate Allure report
+        if: always()
+        run: |
+          if command -v allure >/dev/null 2>&1; then
+            allure generate "${{ github.workspace }}/reports/allure-results" \
+              -o "${{ github.workspace }}/reports/allure-report" --clean
+          else
+            echo "Allure command not found, skip generating HTML report"
+          fi
+
+      - name: Upload json report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-json-report
+          path: ${{ github.workspace }}/reports/report.json
+          if-no-files-found: ignore
+
+      - name: Upload feishu summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: feishu-summary
+          path: ${{ github.workspace }}/reports/feishu_summary.json
+          if-no-files-found: ignore
 
       - name: Upload allure results
         if: always()
@@ -95,6 +127,14 @@ jobs:
         with:
           name: allure-results
           path: ${{ github.workspace }}/reports/allure-results
+          if-no-files-found: ignore
+
+      - name: Upload allure html report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report
+          path: ${{ github.workspace }}/reports/allure-report
           if-no-files-found: ignore
 
       - name: Upload appium log
@@ -115,23 +155,122 @@ jobs:
 
       - name: Notify Feishu
         if: always()
+        env:
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_WORKSPACE: ${{ github.workspace }}
         run: |
-          if [ "${{ steps.run_tests.outputs.exit_code }}" = "0" ]; then
-            STATUS="成功"
-          else
-            STATUS="失败"
-          fi
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
 
-          ACTION_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          workspace = os.environ["GITHUB_WORKSPACE"]
+          summary_path = os.path.join(workspace, "reports", "feishu_summary.json")
 
-          curl -X POST "${{ secrets.FEISHU_WEBHOOK }}" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"msg_type\": \"text\",
-              \"content\": {
-                \"text\": \"【Android冒烟自动化】执行${STATUS}\n仓库：${{ github.repository }}\n分支：${{ github.ref_name }}\n执行人：${{ github.actor }}\n详情：${ACTION_URL}\"
+          if os.path.exists(summary_path):
+              with open(summary_path, "r", encoding="utf-8") as f:
+                  summary = json.load(f)
+          else:
+              summary = {
+                  "total": 0,
+                  "passed": 0,
+                  "failed": 0,
+                  "skipped": 0,
+                  "failed_cases": [{"nodeid": "feishu_summary.json not found"}]
               }
-            }"
+
+          total = summary.get("total", 0)
+          passed = summary.get("passed", 0)
+          failed = summary.get("failed", 0)
+          skipped = summary.get("skipped", 0)
+          failed_cases = summary.get("failed_cases", [])
+
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          run_id = os.environ.get("GITHUB_RUN_ID", "")
+          actor = os.environ.get("GITHUB_ACTOR", "")
+          ref_name = os.environ.get("GITHUB_REF_NAME", "")
+
+          action_url = f"https://github.com/{repo}/actions/runs/{run_id}"
+
+          status = "✅ 成功" if failed == 0 else "❌ 失败"
+          color = "green" if failed == 0 else "red"
+
+          case_lines = []
+          for case in failed_cases[:10]:
+              nodeid = case.get("nodeid", "unknown")
+              case_lines.append(f"- {nodeid}")
+
+          failed_text = "\n".join(case_lines) if case_lines else "无"
+
+          extra_note = ""
+          if failed > 0:
+              extra_note = (
+                  "\n> 失败截图与错误堆栈请进入 GitHub Actions，下载 allure-report / screenshots / appium-log 查看。"
+              )
+
+          card = {
+              "msg_type": "interactive",
+              "card": {
+                  "config": {
+                      "wide_screen_mode": True
+                  },
+                  "header": {
+                      "template": color,
+                      "title": {
+                          "tag": "plain_text",
+                          "content": f"Android冒烟自动化 {status}"
+                      }
+                  },
+                  "elements": [
+                      {
+                          "tag": "markdown",
+                          "content": (
+                              f"**仓库**：{repo}\n"
+                              f"**分支**：{ref_name}\n"
+                              f"**执行人**：{actor}\n"
+                              f"**总数**：{total}\n"
+                              f"**成功**：{passed}\n"
+                              f"**失败**：{failed}\n"
+                              f"**跳过**：{skipped}"
+                              f"{extra_note}"
+                          )
+                      },
+                      {
+                          "tag": "markdown",
+                          "content": f"**失败用例列表**：\n{failed_text}"
+                      },
+                      {
+                          "tag": "action",
+                          "actions": [
+                              {
+                                  "tag": "button",
+                                  "text": {
+                                      "tag": "plain_text",
+                                      "content": "查看 Actions 详情"
+                                  },
+                                  "type": "primary",
+                                  "url": action_url
+                              }
+                          ]
+                      }
+                  ]
+              }
+          }
+
+          data = json.dumps(card).encode("utf-8")
+          req = urllib.request.Request(
+              os.environ["FEISHU_WEBHOOK"],
+              data=data,
+              headers={"Content-Type": "application/json"}
+          )
+
+          with urllib.request.urlopen(req) as resp:
+              print(resp.read().decode("utf-8"))
+          PY
 
       - name: Fail job if tests failed
         if: steps.run_tests.outputs.exit_code != '0'

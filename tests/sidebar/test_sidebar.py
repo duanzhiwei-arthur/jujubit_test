@@ -1,7 +1,7 @@
 from pages.home_page import HomePage
 
 
-def test_click_sidebar_button_should_show_messages(driver):
+def test_click_sidebar_button_should_show_messages(driver, ensure_login):
     """
     点击侧边栏按钮，断言出现 Messages 文案
     """
