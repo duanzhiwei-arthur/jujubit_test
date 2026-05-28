@@ -1,63 +1,50 @@
 from appium.webdriver.common.appiumby import AppiumBy
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.common.exceptions import TimeoutException
-from core.base_page import BasePage
 
 
-class GoogleAccountPage(BasePage):
-    """
-    Google 账号选择页
-    """
+class GoogleAccountPage:
+    def __init__(self, driver):
+        self.driver = driver
 
-    ALL_TEXT_VIEWS = (AppiumBy.CLASS_NAME, "android.widget.TextView")
-
-    def account_locator_by_email(self, email):
-        return (
-            AppiumBy.ANDROID_UIAUTOMATOR,
-            f'new UiSelector().text("{email}")'
-        )
-
-    def is_loaded(self, timeout=10):
-        """
-        判断 Google 账号页是否加载完成
-        这里用页面上出现 TextView 作为宽松判断
-        如果后续你能拿到更精准的标题 locator，建议替换
-        """
+    def _exists(self, by, value):
         try:
-            WebDriverWait(self.driver, timeout).until(
-                lambda d: len(d.find_elements(*self.ALL_TEXT_VIEWS)) > 0
-            )
-            return True
-        except TimeoutException:
+            return len(self.driver.find_elements(by, value)) > 0
+        except Exception:
             return False
 
-    def wait_for_account_page_loaded(self, timeout=10):
-        """
-        等待 Google 账号页加载完成
-        """
-        WebDriverWait(self.driver, timeout).until(
-            lambda d: len(d.find_elements(*self.ALL_TEXT_VIEWS)) > 0
-        )
-        return True
+    def is_account_chooser_displayed(self):
+        print("[GoogleAccountPage] 检查是否为账号选择页")
 
-    def choose_account_by_email(self, email):
-        """
-        按邮箱选择账号
-        """
-        self.wait_for_account_page_loaded()
-        locator = self.account_locator_by_email(email)
-        self.click(locator)
+        candidates = [
+            (AppiumBy.XPATH, "//*[@text='Choose an account']"),
+            (AppiumBy.XPATH, "//*[contains(@text,'Choose an account')]"),
+            (AppiumBy.XPATH, "//*[contains(@text,'Google')]"),
+        ]
+
+        for locator in candidates:
+            if self._exists(*locator):
+                print(f"[GoogleAccountPage] 命中 locator: {locator}")
+                return True
+
+        return False
+
+    def try_choose_account_by_email(self, email):
+        print(f"[GoogleAccountPage] 按邮箱选择账号: {email}")
+        locator = (AppiumBy.XPATH, f"//*[@text='{email}']")
+        elements = self.driver.find_elements(*locator)
+        if elements:
+            elements[0].click()
+            return True
+        return False
 
     def choose_first_account(self):
-        """
-        兜底：选择第一个可见文本账号
-        注意：这个方法不够精准，只建议临时使用
-        """
-        self.wait_for_account_page_loaded()
-        elements = self.driver.find_elements(*self.ALL_TEXT_VIEWS)
-        for element in elements:
-            text = element.text.strip()
+        print("[GoogleAccountPage] 兜底选择第一个账号")
+        candidates = self.driver.find_elements(
+            AppiumBy.XPATH,
+            "//android.widget.TextView"
+        )
+        for el in candidates:
+            text = (el.text or "").strip()
             if "@" in text:
-                element.click()
+                el.click()
                 return
-        raise AssertionError("Google 账号页中未找到可点击的邮箱账号")
+        raise Exception("未找到可点击的 Google 账号")

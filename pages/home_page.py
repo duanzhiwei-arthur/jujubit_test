@@ -1,55 +1,211 @@
+import time
 from appium.webdriver.common.appiumby import AppiumBy
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from core.base_page import BasePage
 
 
-class HomePage(BasePage):
-    # ===== 首页唯一标识 =====
-    # 注意：这里是示例 locator，你需要根据真实页面调整
-    SIDEBAR_BUTTON = (AppiumBy.XPATH, "//android.widget.Button")
-    # ===== 侧边栏相关元素 =====
-    MESSAGES_TEXT = (AppiumBy.ACCESSIBILITY_ID, "Messages")
-    INSPIRATION_TEXT = (AppiumBy.ACCESSIBILITY_ID, "Inspiration")
-    CREATE_TEXT = (AppiumBy.ACCESSIBILITY_ID, "Create Now")
-
-    def __init__(self, driver, timeout=10):
+class HomePage:
+    def __init__(self, driver):
         self.driver = driver
-        self.timeout = timeout
-    
-    def is_loaded(self):
-        """
-        判断首页是否加载完成
-        """
-        return self.is_displayed(self.SIDEBAR_BUTTON, timeout=8)
-    def is_sidebar_button_displayed(self):
-        """
-        判断侧边栏按钮是否显示
-        """
-        return self.is_displayed(self.SIDEBAR_BUTTON, timeout=5)
+
+        # 首页/登录后有效页面特征
+        self.home_locators = [
+            (AppiumBy.CLASS_NAME, "android.widget.Button"),
+        ]
+
+        # 侧边栏按钮候选定位器
+        self.sidebar_button_locators = [
+            (AppiumBy.CLASS_NAME, "android.widget.Button"),
+        ]
+
+        # Messages 文案候选定位器
+        self.messages_locators = [
+            (AppiumBy.ACCESSIBILITY_ID, "Messages"),
+        ]
+
+        #inspiration 文案候选定位器
+        self.inspiration_locators = [
+            (AppiumBy.ACCESSIBILITY_ID, "Inspiration"),
+        ]
+
+        #creat new 文案候选定位器
+        self.creat_new_locators = [
+            (AppiumBy.ACCESSIBILITY_ID, "Create Now"),
+        ]
+
+        #How it works 文案候选定位器
+        self.how_it_works_locators = [
+            (AppiumBy.ACCESSIBILITY_ID, "How it works"),
+        ]
+
+        #Let's Create 文案候选定位器
+        self.lets_create_locators = [
+            (AppiumBy.ACCESSIBILITY_ID, "Let's Create"),
+        ]
+
+        # Messages清扫按钮
+        self.clean_locators = [
+            (AppiumBy.CLASS_NAME, "android.widget.ImageView"),
+        ]
+
+        # 返回上一步按钮
+        self.Back_locators = [
+            (AppiumBy.ACCESSIBILITY_ID, "Back"),
+        ]
+
+
+
+    def _find_first(self, locators):
+        for locator in locators:
+            try:
+                elements = self.driver.find_elements(*locator)
+                if elements:
+                    print(f"[HomePage] 命中 locator: {locator}")
+                    return elements[0]
+            except Exception:
+                continue
+        return None
+
+    def _exists_once(self, locator):
+        try:
+            return len(self.driver.find_elements(*locator)) > 0
+        except Exception:
+            return False
+
+    def is_loaded(self, timeout=0):
+        print("[HomePage] 检查是否为首页")
+
+        if timeout is None or timeout <= 0:
+            for locator in self.home_locators:
+                if self._exists_once(locator):
+                    print(f"[HomePage] 命中 locator: {locator}")
+                    return True
+            return False
+
+        start = time.time()
+        interval = 0.3
+
+        while time.time() - start < timeout:
+            for locator in self.home_locators:
+                if self._exists_once(locator):
+                    print(f"[HomePage] 命中 locator: {locator}")
+                    return True
+            time.sleep(interval)
+
+        return False
+
     def click_sidebar_button(self):
-        """
-        点击侧边栏按钮
-        """
-        self.click(self.SIDEBAR_BUTTON)
-    def is_messages_displayed(self):
-        """
-        判断 Messages 是否显示
-        """
-        return self.is_displayed(self.MESSAGES_TEXT, timeout=5)
-    def is_inspiration_displayed(self):
-        """
-        判断 Inspiration 是否显示
-        """
-        return self.is_displayed(self.INSPIRATION_TEXT, timeout=5)
-    def click_sidebar_Inspiration(self):
-        """
-        点击侧边栏中的 Inspiration
-        保持和你测试代码一致
-        """
-        self.click(self.INSPIRATION_TEXT)
-    def is_create_displayed(self):
-        """
-        判断 Create Now 是否显示
-        """
-        return self.is_displayed(self.CREATE_TEXT, timeout=8)
+        print("[HomePage] 点击侧边栏按钮")
+        button = self._find_first(self.sidebar_button_locators)
+        if not button:
+            raise Exception("未找到侧边栏按钮")
+        button.click()
+
+    def is_messages_visible(self, timeout=2):
+        print("[HomePage] 检查 Messages 是否可见")
+
+        start = time.time()
+        interval = 0.3
+
+        while time.time() - start < timeout:
+            for locator in self.messages_locators:
+                if self._exists_once(locator):
+                    print(f"[HomePage] 命中 Messages locator: {locator}")
+                    return True
+            time.sleep(interval)
+
+        return False
+    
+
+    def click_messages_button(self):
+        print("[HomePage] 点击 Messages 按钮")
+        button = self._find_first(self.messages_locators)
+        if not button:
+            raise Exception("未找到 Messages 按钮")
+        button.click()
+
+    def is_clean_visible(self, timeout=2):
+        print("[HomePage] 检查清扫按钮是否可见")
+
+        start = time.time()
+        interval = 0.3
+
+        while time.time() - start < timeout:
+            for locator in self.clean_locators:
+                if self._exists_once(locator):
+                    print(f"[HomePage] 命中清扫按钮 locator: {locator}")
+                    return True
+            time.sleep(interval)
+
+        return False
+    
+    def click_back_button(self):
+        print("[HomePage] 点击 Back 按钮")
+        button = self._find_first(self.Back_locators)
+        if not button:
+            raise Exception("未找到 Back 按钮")
+        button.click()
+
+    def is_inspiration_visible(self, timeout=2):
+        print("[HomePage] 检查inspiration按钮是否可见")
+
+        start = time.time()
+        interval = 0.3
+
+        while time.time() - start < timeout:
+            for locator in self.inspiration_locators:
+                if self._exists_once(locator):
+                    print(f"[HomePage] 命中inspiration文案 locator: {locator}")
+                    return True
+            time.sleep(interval)
+
+        return False
+    
+    def click_inspiration_button(self):
+        print("[HomePage] 点击 Inspiration 按钮")
+        button = self._find_first(self.inspiration_locators)
+        if not button:
+            raise Exception("未找到 Inspiration 按钮")
+        button.click()
+
+    def is_create_now_visible(self, timeout=2):
+        print("[HomePage] 检查Create Now按钮是否可见")
+
+        start = time.time()
+        interval = 0.3
+
+        while time.time() - start < timeout:
+            for locator in self.creat_new_locators:
+                if self._exists_once(locator):
+                    print(f"[HomePage] 命中Create Now按钮 locator: {locator}")
+                    return True
+            time.sleep(interval)
+
+        return False
+    
+    def click_how_it_works_button(self):
+        print("[HomePage] 点击 How it works 按钮")
+        button = self._find_first(self.how_it_works_locators)
+        if not button:
+            raise Exception("未找到 How it works 按钮")
+        button.click()
+
+    def is_lets_create_visible(self, timeout=2):
+        print("[HomePage] 检查Let's Create按钮是否可见")
+
+        start = time.time()
+        interval = 0.3
+
+        while time.time() - start < timeout:
+            for locator in self.lets_create_locators:
+                if self._exists_once(locator):
+                    print(f"[HomePage] 命中Let's Create按钮 locator: {locator}")
+                    return True
+            time.sleep(interval)
+
+        return False
+    
+    def click_lets_create_button(self):
+        print("[HomePage] 点击 Let's Create 按钮")
+        button = self._find_first(self.lets_create_locators)
+        if not button:
+            raise Exception("未找到 Let's Create 按钮")
+        button.click()

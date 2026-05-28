@@ -1,50 +1,59 @@
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
 
 
 class BasePage:
-    def __init__(self, driver, timeout=15):
+    def __init__(self, driver, timeout=10):
         self.driver = driver
         self.timeout = timeout
 
-    def find(self, locator, timeout=None):
-        wait_timeout = timeout if timeout is not None else self.timeout
-        return WebDriverWait(self.driver, wait_timeout).until(
+    def find_element(self, locator, timeout=None):
+        timeout = timeout or self.timeout
+        return WebDriverWait(self.driver, timeout).until(
             EC.presence_of_element_located(locator)
         )
 
-    def find_clickable(self, locator, timeout=None):
-        wait_timeout = timeout if timeout is not None else self.timeout
-        return WebDriverWait(self.driver, wait_timeout).until(
-            EC.element_to_be_clickable(locator)
+    def find_elements(self, locator, timeout=None):
+        timeout = timeout or self.timeout
+        WebDriverWait(self.driver, timeout).until(
+            EC.presence_of_element_located(locator)
         )
+        return self.driver.find_elements(*locator)
 
     def click(self, locator, timeout=None):
-        self.find_clickable(locator, timeout).click()
+        timeout = timeout or self.timeout
+        element = WebDriverWait(self.driver, timeout).until(
+            EC.element_to_be_clickable(locator)
+        )
+        element.click()
 
-    def get_text(self, locator, timeout=None):
-        return self.find(locator, timeout).text
-
-    def get_attribute(self, locator, attr_name, timeout=None):
-        return self.find(locator, timeout).get_attribute(attr_name)
-
-    def is_displayed(self, locator, timeout=None):
+    def is_displayed(self, locator, timeout=5):
         try:
-            return self.find(locator, timeout).is_displayed()
-        except (TimeoutException, NoSuchElementException):
+            element = WebDriverWait(self.driver, timeout).until(
+                EC.visibility_of_element_located(locator)
+            )
+            return element.is_displayed()
+        except Exception:
             return False
 
-    def input_text(self, locator, text, timeout=10):
-        element = self.find(locator, timeout)
-        element.clear()
-        element.send_keys(text)
+    def is_visible(self, locator, timeout=5):
+        return self.is_displayed(locator, timeout=timeout)
 
-    def is_element_exist(self, locator, timeout=3):
+    def is_present(self, locator, timeout=3):
         try:
             WebDriverWait(self.driver, timeout).until(
                 EC.presence_of_element_located(locator)
             )
             return True
-        except (TimeoutException, NoSuchElementException):
+        except Exception:
             return False
+
+    def get_text(self, locator, timeout=None):
+        timeout = timeout or self.timeout
+        return self.find_element(locator, timeout).text
+
+    def save_screenshot(self, file_path):
+        return self.driver.save_screenshot(file_path)
+
+    def get_page_source(self):
+        return self.driver.page_source

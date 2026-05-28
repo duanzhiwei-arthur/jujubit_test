@@ -1,28 +1,28 @@
 from appium.webdriver.common.appiumby import AppiumBy
-from core.base_page import BasePage
 
 
-class WelcomePage(BasePage):
-    BTN_CONTINUE_WITH_GMAIL = (
-        AppiumBy.ACCESSIBILITY_ID,
-        "Continue with Gmail"
-    )
-    BTN_CONTINUE_AS_GUEST = (
-        AppiumBy.ACCESSIBILITY_ID,
-        "Continue as a guest"
-    )
+class WelcomePage:
+    def __init__(self, driver):
+        self.driver = driver
+        self.login_button_locator = (
+            AppiumBy.XPATH,
+            "//*[@content-desc='Continue with Gmail']"
+        )
 
-    def is_loaded(self):
-        return self.is_gmail_button_displayed()
-
-    def is_gmail_button_displayed(self):
-        return self.is_displayed(self.BTN_CONTINUE_WITH_GMAIL)
-
-    def is_guest_button_displayed(self):
-        return self.is_displayed(self.BTN_CONTINUE_AS_GUEST)
+    def is_login_page(self):
+        print("[WelcomePage] 检查是否为登录页")
+        try:
+            elements = self.driver.find_elements(*self.login_button_locator)
+            if elements:
+                print(f"[WelcomePage] 命中登录按钮 locator: {self.login_button_locator}")
+                return True
+            return False
+        except Exception:
+            return False
 
     def tap_continue_with_gmail(self):
-        self.click(self.BTN_CONTINUE_WITH_GMAIL)
-
-    def tap_continue_as_guest(self):
-        self.click(self.BTN_CONTINUE_AS_GUEST)
+        print(f"[WelcomePage] 点击 Google/Gmail 登录按钮: {self.login_button_locator}")
+        elements = self.driver.find_elements(*self.login_button_locator)
+        if not elements:
+            raise Exception("未找到 Continue with Gmail 按钮")
+        elements[0].click()
